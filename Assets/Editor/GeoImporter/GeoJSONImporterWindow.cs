@@ -1,5 +1,4 @@
 ﻿#if UNITY_EDITOR
-using GeoImport.EditorUtil;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.IO;
@@ -9,14 +8,36 @@ using UnityEngine;
 
 namespace GeoImport.Editor
 {
+    using EditorUtil;
+    using LibTessDotNet;
+    using System;
+
+    /// <summary>
+    /// Unity Editor window for importing GeoJSON files and converting their features into Unity prefabs.
+    /// 
+    /// This tool allows you to:
+    /// - Assign a GeoJSON file (as a Unity TextAsset).
+    /// - Set the geographic origin and scale for projection to Unity world space.
+    /// - Configure output folders for generated assets.
+    /// - Specify road widths for different highway types.
+    /// - Import roads, buildings, and landuse features as prefabs with appropriate materials.
+    /// 
+    /// Usage:
+    /// 1. Open via Tools &gt; Geo Import &gt; GeoJSON Importer.
+    /// 2. Assign a GeoJSON TextAsset.
+    /// 3. Adjust import settings as needed.
+    /// 4. Click "Import → Prefabs" to generate prefabs in the specified output folder.
+    /// </summary>
     public class GeoJSONImporterWindow : EditorWindow
     {
+        /// <summary>
+        /// Shows the GeoJSON Importer window in the Unity Editor.
+        /// </summary>
         [MenuItem("Tools/Geo Import/GeoJSON Importer")]
         public static void ShowWindow()
         {
             GetWindow<GeoJSONImporterWindow>("GeoJSON Importer");
         }
-
 
         /// <summary>
         /// The GeoJSON file to import. Should be assigned as a Unity TextAsset containing valid GeoJSON.
@@ -81,7 +102,6 @@ namespace GeoImport.Editor
         /// </summary>
         public float serviceWidth = 4f;
 
-
         /// <summary>
         /// The material used for rendering imported road meshes.
         /// </summary>
@@ -97,7 +117,24 @@ namespace GeoImport.Editor
         /// </summary>
         Material landuseMat;
 
+        /// <summary>
+        /// Whether to convert imported features into chunk prefabs.
+        /// </summary>
+        public bool buildChunks = true;
 
+        /// <summary>
+        /// The size of each chunk in meters.
+        /// </summary>
+        public int chunkSizeMeters = 25;
+
+        /// <summary>
+        /// Whether to segment long roads into smaller chunks to allow long roads to be part of the chunk it's in.
+        /// </summary>
+        public bool segmentLongRoads = true;
+
+        /// <summary>
+        /// Draws the GUI for the GeoJSON Importer window, allowing users to set import options and trigger the import process.
+        /// </summary>
         void OnGUI()
         {
             EditorGUILayout.HelpBox("Requires package: com.unity.nuget.newtonsoft-json", MessageType.Info);
@@ -106,7 +143,6 @@ namespace GeoImport.Editor
             originLon = EditorGUILayout.DoubleField("Origin Lon", originLon);
             metersToUnity = EditorGUILayout.FloatField("Meters → Unity", metersToUnity);
             outputFolder = EditorGUILayout.TextField("Output Folder", outputFolder);
-
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Road Widths (meters)", EditorStyles.boldLabel);
@@ -118,6 +154,10 @@ namespace GeoImport.Editor
             pathWidth = EditorGUILayout.FloatField("path", pathWidth);
             defaultRoadWidth = EditorGUILayout.FloatField("default", defaultRoadWidth);
 
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Chunking", EditorStyles.boldLabel);
+            buildChunks = EditorGUILayout.Toggle("Build Chunks", buildChunks);
+            chunkSizeMeters = EditorGUILayout.IntField("Chunk Size (m)", chunkSizeMeters);
 
             if (GUILayout.Button("Import → Prefabs"))
             {
@@ -126,25 +166,7 @@ namespace GeoImport.Editor
             }
         }
 
-        /// <summary>
-        /// Ensures that the output folder and its Materials subfolder exist in the Unity project.
-        /// Loads or creates the required materials for roads, buildings, and landuse features.
-        /// </summary>
-        void EnsureMaterials()
-        {
-            if (!AssetDatabase.IsValidFolder(outputFolder))
-            {
-                var parent = Path.GetDirectoryName(outputFolder);
-                var leaf = Path.GetFileName(outputFolder);
-                if (!AssetDatabase.IsValidFolder(parent)) AssetDatabase.CreateFolder(Path.GetDirectoryName(parent), Path.GetFileName(parent));
-                AssetDatabase.CreateFolder(parent, leaf);
-            }
-            string matFolder = outputFolder + "/Materials";
-            if (!AssetDatabase.IsValidFolder(matFolder)) AssetDatabase.CreateFolder(outputFolder, "Materials");
-            roadMat = LoadOrCreateMat(matFolder + "/Road.mat", new Color(0.15f, 0.15f, 0.15f, 1));
-            buildingMat = LoadOrCreateMat(matFolder + "/Building.mat", new Color(0.85f, 0.85f, 0.85f, 1));
-            landuseMat = LoadOrCreateMat(matFolder + "/Landuse.mat", new Color(0.75f, 0.9f, 0.75f, 1));
-        }
+        static string ReadTag(JToken feature, string name) => (string)feature["properties"]?[name];
 
         /// <summary>
         /// Imports GeoJSON features and creates Unity prefabs for roads, buildings, and landuse areas.
@@ -161,60 +183,87 @@ namespace GeoImport.Editor
         /// </summary>
         void Import()
         {
-            EnsureMaterials();
-            string json = geojson.text;
-            var root = JObject.Parse(json);
-            var features = (JArray)root["features"];
-            if (features == null) { Debug.LogError("No features found"); return; }
+            EnsureMaterials();                          // Make sure materials and folders exist
+            string json = geojson.text;                 // Get the GeoJSON text
+            var geoJsonRoot = JObject.Parse(json);      // Parse the JSON using Newtonsoft.Json
+            var featuresArray = (JArray)geoJsonRoot["features"];    // Read the features array
+            if (featuresArray == null) { Debug.LogError("No features found"); return; }
 
             string meshFolder = outputFolder + "/Meshes";
             if (!AssetDatabase.IsValidFolder(meshFolder)) AssetDatabase.CreateFolder(outputFolder, "Meshes");
             string prefabFolder = outputFolder + "/Prefabs";
             if (!AssetDatabase.IsValidFolder(prefabFolder)) AssetDatabase.CreateFolder(outputFolder, "Prefabs");
+            string chunkFolder = outputFolder + "/Chunks";
+            if (!AssetDatabase.IsValidFolder(chunkFolder)) AssetDatabase.CreateFolder(outputFolder, "Chunks");
 
-            var parentGO = new GameObject("GeoImported_Scene");
+            var rootGameObject = new GameObject("GeoImported_Scene"); // Doesn't work currently, empty prefab is created and nothing put in.
 
-            int roadCount = 0, buildingCount = 0, landuseCount = 0;
+            int roadCount = 0, buildingCount = 0, landuseCount = 0, plazaCount = 0, chunkCount = 0;
 
-            foreach (var f in features)
+            foreach (var featureToken in featuresArray)
             {
-                var geom = f["geometry"] as JObject; if (geom == null) continue;
-                string gtype = (string)geom["type"];
-                var props = f["properties"] as JObject ?? new JObject();
-                string highway = (string)props["highway"];
-                string building = (string)props["building"];
-                string landuse = (string)props["landuse"];
+                if (featureToken["geometry"] is not JObject geometryObject) continue;
+                string geometryType = (string)geometryObject["type"];
+                string highway = ReadTag(featureToken, "highway");
+                string building = ReadTag(featureToken, "building");
+                string landuse = ReadTag(featureToken, "landuse");
 
-                if (gtype == "LineString" && !string.IsNullOrEmpty(highway))
+
+                if (geometryType == "LineString" && !string.IsNullOrEmpty(highway))
                 {
-                    var pts = ReadLineString(geom);
-                    MakeRoad(pts, highway, prefabFolder, meshFolder, parentGO.transform, ref roadCount);
+                    var linePoints = ReadLineString(geometryObject);
+                    MakeRoad(linePoints, highway, meshFolder, rootGameObject.transform, ref roadCount);
                 }
-                else if (gtype == "Polygon")
+                else if (geometryType == "Polygon")
                 {
-                    var rings = ReadPolygon(geom);
-                    if (!string.IsNullOrEmpty(building)) MakeArea(rings, buildingMat, "Building_", prefabFolder, meshFolder, parentGO.transform, ref buildingCount);
-                    else if (!string.IsNullOrEmpty(landuse)) MakeArea(rings, landuseMat, "Landuse_", prefabFolder, meshFolder, parentGO.transform, ref landuseCount);
+                    var polygonRings = ReadPolygon(geometryObject);
+                    if (!string.IsNullOrEmpty(highway) || ReadTag(featureToken, "area") == "yes") MakeArea(polygonRings, roadMat, "Plaza_", meshFolder, rootGameObject.transform, ref plazaCount);
+                    else if (!string.IsNullOrEmpty(building)) MakeArea(polygonRings, buildingMat, "Building_", meshFolder, rootGameObject.transform, ref buildingCount);
+                    else if (!string.IsNullOrEmpty(landuse) && landuse == "grass") MakeArea(polygonRings, landuseMat, "Landuse_", meshFolder, rootGameObject.transform, ref landuseCount);
                 }
-                else if (gtype == "MultiPolygon")
+                else if (geometryType == "MultiPolygon")
                 {
-                    var polys = ReadMultiPolygon(geom);
-                    foreach (var rings in polys)
+                    var polygons = ReadMultiPolygon(geometryObject);
+                    foreach (var polygonRings in polygons)
                     {
-                        if (!string.IsNullOrEmpty(building)) MakeArea(rings, buildingMat, "Building_", prefabFolder, meshFolder, parentGO.transform, ref buildingCount);
-                        else if (!string.IsNullOrEmpty(landuse)) MakeArea(rings, landuseMat, "Landuse_", prefabFolder, meshFolder, parentGO.transform, ref landuseCount);
+                        if (!string.IsNullOrEmpty(building)) MakeArea(polygonRings, buildingMat, "Building_", meshFolder, rootGameObject.transform, ref buildingCount);
+                        else if (!string.IsNullOrEmpty(landuse) && landuse == "grass") MakeArea(polygonRings, landuseMat, "Landuse_", meshFolder, rootGameObject.transform, ref landuseCount);
                     }
                 }
             }
 
             // Save the parent as a prefab for convenience
             string parentPath = prefabFolder + "/GeoImported_Scene.prefab";
-            PrefabUtility.SaveAsPrefabAsset(parentGO, parentPath);
-            DestroyImmediate(parentGO);
+            PrefabUtility.SaveAsPrefabAsset(rootGameObject, parentPath);
+            DestroyImmediate(rootGameObject);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Imported: Roads {roadCount}, Buildings {buildingCount}, Landuse {landuseCount}");
+            //if (buildChunks)
+            //    ChunkingProcess(chunkSizeMeters, ref chunkCount);
+
+            Debug.Log($"Imported: Roads {roadCount}, Buildings {buildingCount}, Area/Plaza's {plazaCount}, Landuse {landuseCount}" +
+                $"\nChunks Created: {chunkCount}");
+        }
+
+        /// <summary>
+        /// Ensures that the output folder and its Materials subfolder exist in the Unity project.
+        /// Loads or creates the required materials for roads, buildings, and landuse features.
+        /// </summary>
+        void EnsureMaterials()
+        {
+            if (!AssetDatabase.IsValidFolder(outputFolder))
+            {
+                var parentFolder = Path.GetDirectoryName(outputFolder);
+                var leafFolderName = Path.GetFileName(outputFolder);
+                if (!AssetDatabase.IsValidFolder(parentFolder)) AssetDatabase.CreateFolder(Path.GetDirectoryName(parentFolder), Path.GetFileName(parentFolder));
+                AssetDatabase.CreateFolder(parentFolder, leafFolderName);
+            }
+            string materialsFolder = outputFolder + "/Materials";
+            if (!AssetDatabase.IsValidFolder(materialsFolder)) AssetDatabase.CreateFolder(outputFolder, "Materials");
+            roadMat = LoadOrCreateMat(materialsFolder + "/Road.mat", new Color(0.15f, 0.15f, 0.15f, 1));
+            buildingMat = LoadOrCreateMat(materialsFolder + "/Building.mat", new Color(0.85f, 0.85f, 0.85f, 1));
+            landuseMat = LoadOrCreateMat(materialsFolder + "/Landuse.mat", new Color(0.75f, 0.9f, 0.75f, 1));
         }
 
         /// <summary>
@@ -229,13 +278,16 @@ namespace GeoImport.Editor
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (!mat)
             {
-                mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                mat.color = c;
+                mat = new(Shader.Find("Universal Render Pipeline/Unlit"))
+                {
+                    color = c
+                };
                 AssetDatabase.CreateAsset(mat, path);
             }
             return mat;
         }
 
+        #region Geometry Readers
         /// <summary>
         /// Reads a GeoJSON LineString geometry and converts it to a list of 2D points in Unity meters.
         /// Each point is projected from geographic coordinates (longitude, latitude) to Unity world space using the specified origin and scale.
@@ -246,18 +298,18 @@ namespace GeoImport.Editor
         /// </returns>
         List<Vector2> ReadLineString(JObject geom)
         {
-            var arr = (JArray)geom["coordinates"]; // [[lon,lat], ...]
-            var ptsLonLat = new List<Vector2>(arr.Count);
-            foreach (var c in arr)
+            var coordinatesArray = (JArray)geom["coordinates"]; // [[lon,lat], ...]
+            var lonLatPoints = new List<Vector2>(coordinatesArray.Count);
+            foreach (var coordinate in coordinatesArray)
             {
-                float lon = (float)c[0];
-                float lat = (float)c[1];
-                ptsLonLat.Add(new Vector2(lon, lat));
+                float lon = (float)coordinate[0];
+                float lat = (float)coordinate[1];
+                lonLatPoints.Add(new Vector2(lon, lat));
             }
-            var meters = GeoProjection.LatLonArrayToMeters(ptsLonLat, originLat, originLon);
-            var list = new List<Vector2>(meters.Length);
-            foreach (var m in meters) list.Add(m * metersToUnity);
-            return list;
+            var metersPoints = GeoProjection.LatLonArrayToMeters(lonLatPoints, originLat, originLon);
+            var pointsInUnityMeters = new List<Vector2>(metersPoints.Length);
+            foreach (var meterPoint in metersPoints) pointsInUnityMeters.Add(meterPoint * metersToUnity);
+            return pointsInUnityMeters;
         }
 
         /// <summary>
@@ -272,26 +324,25 @@ namespace GeoImport.Editor
         /// </returns>
         List<List<Vector2>> ReadPolygon(JObject geom)
         {
-            // coordinates: [ [ [lon,lat], ... outer ... ], [ ... hole1 ... ], ... ]
-            var ringsOut = new List<List<Vector2>>();
-            var coords = (JArray)geom["coordinates"];
-            if (coords == null) return ringsOut;
-            for (int r = 0; r < coords.Count; r++)
+            var ringsInUnityMeters = new List<List<Vector2>>();
+            var coordinatesArray = (JArray)geom["coordinates"];
+            if (coordinatesArray == null) return ringsInUnityMeters;
+            for (int r = 0; r < coordinatesArray.Count; r++)
             {
-                var ring = (JArray)coords[r];
-                var ptsLonLat = new List<Vector2>(ring.Count);
-                foreach (var c in ring)
+                var ringArray = (JArray)coordinatesArray[r];
+                var ringLonLatPoints = new List<Vector2>(ringArray.Count);
+                foreach (var coordinate in ringArray)
                 {
-                    float lon = (float)c[0];
-                    float lat = (float)c[1];
-                    ptsLonLat.Add(new Vector2(lon, lat));
+                    float lon = (float)coordinate[0];
+                    float lat = (float)coordinate[1];
+                    ringLonLatPoints.Add(new Vector2(lon, lat));
                 }
-                var meters = GeoProjection.LatLonArrayToMeters(ptsLonLat, originLat, originLon);
-                var list = new List<Vector2>(meters.Length);
-                foreach (var m in meters) list.Add(m * metersToUnity);
-                ringsOut.Add(list);
+                var ringMetersPoints = GeoProjection.LatLonArrayToMeters(ringLonLatPoints, originLat, originLon);
+                var ringUnityPoints = new List<Vector2>(ringMetersPoints.Length);
+                foreach (var meterPoint in ringMetersPoints) ringUnityPoints.Add(meterPoint * metersToUnity);
+                ringsInUnityMeters.Add(ringUnityPoints);
             }
-            return ringsOut;
+            return ringsInUnityMeters;
         }
 
         /// <summary>
@@ -305,30 +356,31 @@ namespace GeoImport.Editor
         /// </returns>
         List<List<List<Vector2>>> ReadMultiPolygon(JObject geom)
         {
-            var polys = new List<List<List<Vector2>>>();
-            var coords = (JArray)geom["coordinates"]; // [ [ [ [lon,lat],... ] (ring), ... ] (poly), ... ]
-            if (coords == null) return polys;
-            foreach (var poly in coords)
+            var polygons = new List<List<List<Vector2>>>();
+            var coordinatesArray = (JArray)geom["coordinates"];
+            if (coordinatesArray == null) return polygons;
+            foreach (var polygon in coordinatesArray)
             {
-                var polyRings = new List<List<Vector2>>();
-                foreach (var ring in (JArray)poly)
+                var polygonRings = new List<List<Vector2>>();
+                foreach (var ringArray in (JArray)polygon)
                 {
-                    var ptsLonLat = new List<Vector2>();
-                    foreach (var c in (JArray)ring)
+                    var ringLonLatPoints = new List<Vector2>();
+                    foreach (var coordinate in (JArray)ringArray)
                     {
-                        float lon = (float)c[0];
-                        float lat = (float)c[1];
-                        ptsLonLat.Add(new Vector2(lon, lat));
+                        float lon = (float)coordinate[0];
+                        float lat = (float)coordinate[1];
+                        ringLonLatPoints.Add(new Vector2(lon, lat));
                     }
-                    var meters = GeoProjection.LatLonArrayToMeters(ptsLonLat, originLat, originLon);
-                    var list = new List<Vector2>(meters.Length);
-                    foreach (var m in meters) list.Add(m * metersToUnity);
-                    polyRings.Add(list);
+                    var ringMetersPoints = GeoProjection.LatLonArrayToMeters(ringLonLatPoints, originLat, originLon);
+                    var ringUnityPoints = new List<Vector2>(ringMetersPoints.Length);
+                    foreach (var meterPoint in ringMetersPoints) ringUnityPoints.Add(meterPoint * metersToUnity);
+                    polygonRings.Add(ringUnityPoints);
                 }
-                polys.Add(polyRings);
+                polygons.Add(polygonRings);
             }
-            return polys;
+            return polygons;
         }
+        #endregion Geometry Readers
 
         /// <summary>
         /// Returns the road width in meters for a given highway type.
@@ -356,76 +408,134 @@ namespace GeoImport.Editor
         /// Creates a road mesh from a polyline, assigns the road material, saves the mesh and prefab assets,
         /// parents the resulting GameObject, and increments the road counter.
         /// </summary>
-        /// <param name="pts">List of 2D points representing the road centerline in Unity meters.</param>
+        /// <param name="polylinePoints">List of 2D points representing the road centerline in Unity meters.</param>
         /// <param name="highwayType">Highway type string (e.g., "primary", "residential") used for width and naming.</param>
         /// <param name="prefabFolder">Folder path to save the prefab asset.</param>
         /// <param name="meshFolder">Folder path to save the mesh asset.</param>
-        /// <param name="parent">Transform to parent the created GameObject under.</param>
+        /// <param name="parentTransform">Transform to parent the created GameObject under.</param>
         /// <param name="counter">Reference to an integer counter for unique asset naming; incremented after creation.</param>
-        void MakeRoad(List<Vector2> pts, string highwayType, string prefabFolder, string meshFolder, Transform parent, ref int counter)
+        void MakeRoad(List<Vector2> polylinePoints, string highwayType, string meshFolder, Transform parentTransform, ref int counter)
         {
-            if (pts.Count < 2) return;
-            float w = WidthForHighway(highwayType);
-            var mesh = PolylineMeshBuilder.Build(pts, w);
+            if (polylinePoints.Count < 2) return;
+            float roadWidth = WidthForHighway(highwayType);
+            var roadMesh = PolylineMeshBuilder.Build(polylinePoints, roadWidth);
             string meshPath = $"{meshFolder}/Road_{highwayType}_{counter}.asset";
-            AssetDatabase.CreateAsset(mesh, meshPath);
+            AssetDatabase.CreateAsset(roadMesh, meshPath);
 
-
-            var go = new GameObject($"Road_{highwayType}_{counter}");
-            var mf = go.AddComponent<MeshFilter>();
-            var mr = go.AddComponent<MeshRenderer>();
-            mf.sharedMesh = mesh; mr.sharedMaterial = roadMat;
-            go.transform.SetParent(parent, false);
-
-
-            string prefabPath = $"{prefabFolder}/Road_{highwayType}_{counter}.prefab";
-            PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
-            Object.DestroyImmediate(go);
+            var roadGameObject = new GameObject($"Road_{highwayType}_{counter}");
+            var meshFilter = roadGameObject.AddComponent<MeshFilter>();
+            var meshRenderer = roadGameObject.AddComponent<MeshRenderer>();
+            meshFilter.sharedMesh = roadMesh;
+            meshRenderer.sharedMaterial = roadMat;
             counter++;
+        }
+
+
+        void MakeArea(List<List<Vector2>> rings, Material material, string prefix,
+                      string meshFolder, Transform parentTransform, ref int counter)
+        {
+            if (rings.Count == 0 || rings[0].Count < 3) return;
+
+            // --- Tessellate with LibTess ---
+            var tess = new Tess();
+
+            foreach (var ring in rings)
+            {
+                if (ring.Count < 3) continue;
+
+                var contour = new ContourVertex[ring.Count];
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    contour[i].Position = new Vec3(ring[i].x, ring[i].y, 0);
+                }
+
+                tess.AddContour(contour, ContourOrientation.CounterClockwise);
+            }
+
+            tess.Tessellate(WindingRule.EvenOdd, ElementType.Polygons, 3);
+
+            // --- Build Unity mesh ---
+            var verts = new Vector3[tess.Vertices.Length];
+            for (int i = 0; i < verts.Length; i++)
+            {
+                verts[i] = new Vector3(tess.Vertices[i].Position.X, tess.Vertices[i].Position.Y, 0);
+            }
+
+            var indices = new int[tess.ElementCount * 3];
+            for (int i = 0; i < tess.ElementCount; i++)
+            {
+                indices[i * 3 + 0] = tess.Elements[i * 3 + 0];
+                indices[i * 3 + 1] = tess.Elements[i * 3 + 1];
+                indices[i * 3 + 2] = tess.Elements[i * 3 + 2];
+            }
+
+            var areaMesh = new Mesh();
+            areaMesh.vertices = verts;
+            areaMesh.triangles = indices;
+            areaMesh.RecalculateBounds();
+            areaMesh.RecalculateNormals();
+
+            // --- Save asset & prefab ---
+            string meshPath = $"{meshFolder}/{prefix}{counter}.asset";
+            AssetDatabase.CreateAsset(areaMesh, meshPath);
+
+            var areaGameObject = new GameObject($"{prefix}{counter}");
+            var meshFilter = areaGameObject.AddComponent<MeshFilter>();
+            var meshRenderer = areaGameObject.AddComponent<MeshRenderer>();
+            meshFilter.sharedMesh = areaMesh;
+            meshRenderer.sharedMaterial = material;
+            counter++;
+        }
+
+        #region Chunking process
+        /// <summary>
+        /// 
+        /// </summary>
+        private Dictionary<Vector2Int, List<GameObject>> cellToObjects = new();
+
+        /// <summary>
+        /// 
+        /// </summary>
+        void ChunkingProcess(int chunkSize, ref int counter)
+        {
+            CellBucketing();
+            CreateChunks();
         }
 
         /// <summary>
-        /// Creates a mesh from the outer ring of a polygon (ignoring holes), assigns the specified material,
-        /// saves the mesh and prefab assets, and parents the resulting GameObject.
+        /// 
         /// </summary>
-        /// <param name="rings">List of rings, where each ring is a list of 2D points (outer ring at index 0).</param>
-        /// <param name="mat">Material to assign to the generated mesh.</param>
-        /// <param name="prefix">Prefix for naming the mesh and prefab assets.</param>
-        /// <param name="prefabFolder">Folder path to save the prefab asset.</param>
-        /// <param name="meshFolder">Folder path to save the mesh asset.</param>
-        /// <param name="parent">Transform to parent the created GameObject under.</param>
-        /// <param name="counter">Reference to an integer counter for unique asset naming; incremented after creation.</param>
-        void MakeArea(List<List<Vector2>> rings, Material mat, string prefix, string prefabFolder, string meshFolder, Transform parent, ref int counter)
+        void CellBucketing()
         {
-            if (rings.Count == 0 || rings[0].Count < 3) return;
-            // Outer ring only (index 0). Holes ignored for brevity.
-            var outer = rings[0];
-            var indices = new List<int>();
-            PolygonTriangulator.Triangulate(outer, indices);
-            var verts3 = new List<Vector3>(outer.Count);
-            foreach (var p in outer) verts3.Add(new Vector3(p.x, p.y, 0));
-            var mesh = new Mesh();
-            mesh.SetVertices(verts3);
-            mesh.SetTriangles(indices, 0);
-            mesh.RecalculateBounds(); mesh.RecalculateNormals();
 
-
-            string meshPath = $"{meshFolder}/{prefix}{counter}.asset";
-            AssetDatabase.CreateAsset(mesh, meshPath);
-
-
-            var go = new GameObject($"{prefix}{counter}");
-            var mf = go.AddComponent<MeshFilter>();
-            var mr = go.AddComponent<MeshRenderer>();
-            mf.sharedMesh = mesh; mr.sharedMaterial = mat;
-            go.transform.SetParent(parent, false);
-
-
-            string prefabPath = $"{prefabFolder}/{prefix}{counter}.prefab";
-            PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
-            Object.DestroyImmediate(go);
-            counter++;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        void CreateChunks()
+        {
+            CombineByMaterial();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="listOfObjects"></param>
+        /// <exception cref="NotImplementedException"></exception>
+        void CombineByMaterial()
+        {
+            throw new NotImplementedException();
+        }
+
+        Vector2Int WorldToCell(Vector2 pos)
+        {
+            return new Vector2Int(
+                Mathf.FloorToInt(pos.x / chunkSizeMeters),
+                Mathf.FloorToInt(pos.y / chunkSizeMeters)
+            );
+        }
+        #endregion Chunking process
     }
 }
 #endif
