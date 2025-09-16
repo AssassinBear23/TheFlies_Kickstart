@@ -39,6 +39,8 @@ namespace GeoImport.Editor
             GetWindow<GeoJSONImporterWindow>("GeoJSON Importer");
         }
 
+        public int batchSize = 1000;
+
         /// <summary>
         /// The GeoJSON file to import. Should be assigned as a Unity TextAsset containing valid GeoJSON.
         /// </summary>
@@ -118,6 +120,11 @@ namespace GeoImport.Editor
         Material landuseMat;
 
         /// <summary>
+        /// The material used for rendering imported water meshes.
+        /// </summary>
+        Material waterMat;
+
+        /// <summary>
         /// Whether to convert imported features into chunk prefabs.
         /// </summary>
         public bool buildChunks = true;
@@ -142,6 +149,7 @@ namespace GeoImport.Editor
             originLat = EditorGUILayout.DoubleField("Origin Lat", originLat);
             originLon = EditorGUILayout.DoubleField("Origin Lon", originLon);
             metersToUnity = EditorGUILayout.FloatField("Meters → Unity", metersToUnity);
+            batchSize = EditorGUILayout.IntField("Mesh Batch Size", batchSize);
             outputFolder = EditorGUILayout.TextField("Output Folder", outputFolder);
 
             EditorGUILayout.Space();
@@ -162,10 +170,13 @@ namespace GeoImport.Editor
             if (GUILayout.Button("Import → Prefabs"))
             {
                 if (!geojson) { EditorUtility.DisplayDialog("Error", "Assign a GeoJSON TextAsset", "OK"); return; }
+                if (batchSize <= 100) { EditorUtility.DisplayDialog("Warning", "A low batch size will slow down the importing proccess significantly! Only lower it when you run into memory problems", "I understand"); return; }
                 Import();
             }
+
         }
 
+        private readonly List<MeshWorkItem> pendingMeshes = new();
         static string ReadTag(JToken feature, string name) => (string)feature["properties"]?[name];
 
         /// <summary>
@@ -198,15 +209,22 @@ namespace GeoImport.Editor
 
             var rootGameObject = new GameObject("GeoImported_Scene"); // Doesn't work currently, empty prefab is created and nothing put in.
 
-            int roadCount = 0, buildingCount = 0, landuseCount = 0, plazaCount = 0, chunkCount = 0;
+            int roadCount = 0, buildingCount = 0, landuseCount = 0, plazaCount = 0, waterCount = 0, chunkCount = 0;
 
             foreach (var featureToken in featuresArray)
             {
+                if (pendingMeshes.Count > batchSize)
+                {
+                    BatchSaveAssets();
+                }
+
                 if (featureToken["geometry"] is not JObject geometryObject) continue;
                 string geometryType = (string)geometryObject["type"];
                 string highway = ReadTag(featureToken, "highway");
                 string building = ReadTag(featureToken, "building");
                 string landuse = ReadTag(featureToken, "landuse");
+                string natural = ReadTag(featureToken, "natural");
+                natural ??= ReadTag(featureToken, "waterway");
 
 
                 if (geometryType == "LineString" && !string.IsNullOrEmpty(highway))
@@ -220,6 +238,7 @@ namespace GeoImport.Editor
                     if (!string.IsNullOrEmpty(highway) || ReadTag(featureToken, "area") == "yes") MakeArea(polygonRings, roadMat, "Plaza_", meshFolder, rootGameObject.transform, ref plazaCount);
                     else if (!string.IsNullOrEmpty(building)) MakeArea(polygonRings, buildingMat, "Building_", meshFolder, rootGameObject.transform, ref buildingCount);
                     else if (!string.IsNullOrEmpty(landuse) && landuse == "grass") MakeArea(polygonRings, landuseMat, "Landuse_", meshFolder, rootGameObject.transform, ref landuseCount);
+                    else if (!string.IsNullOrEmpty(natural)) MakeArea(polygonRings, waterMat, "WaterBody_", meshFolder, rootGameObject.transform, ref waterCount);
                 }
                 else if (geometryType == "MultiPolygon")
                 {
@@ -228,14 +247,16 @@ namespace GeoImport.Editor
                     {
                         if (!string.IsNullOrEmpty(building)) MakeArea(polygonRings, buildingMat, "Building_", meshFolder, rootGameObject.transform, ref buildingCount);
                         else if (!string.IsNullOrEmpty(landuse) && landuse == "grass") MakeArea(polygonRings, landuseMat, "Landuse_", meshFolder, rootGameObject.transform, ref landuseCount);
+                        else if (!string.IsNullOrEmpty(natural)) MakeArea(polygonRings, waterMat, "WaterBody_", meshFolder, rootGameObject.transform, ref waterCount);
                     }
                 }
             }
 
-            // Save the parent as a prefab for convenience
+            BatchSaveAssets();
+
             string parentPath = prefabFolder + "/GeoImported_Scene.prefab";
             PrefabUtility.SaveAsPrefabAsset(rootGameObject, parentPath);
-            DestroyImmediate(rootGameObject);
+            //DestroyImmediate(rootGameObject);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
@@ -244,6 +265,20 @@ namespace GeoImport.Editor
 
             Debug.Log($"Imported: Roads {roadCount}, Buildings {buildingCount}, Area/Plaza's {plazaCount}, Landuse {landuseCount}" +
                 $"\nChunks Created: {chunkCount}");
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private void BatchSaveAssets()
+        {
+            AssetDatabase.StartAssetEditing();
+            foreach (var item in pendingMeshes)
+            {
+                AssetDatabase.CreateAsset(item.mesh, item.path);
+            }
+            AssetDatabase.StopAssetEditing();
+            pendingMeshes.Clear();
         }
 
         /// <summary>
@@ -261,9 +296,12 @@ namespace GeoImport.Editor
             }
             string materialsFolder = outputFolder + "/Materials";
             if (!AssetDatabase.IsValidFolder(materialsFolder)) AssetDatabase.CreateFolder(outputFolder, "Materials");
-            roadMat = LoadOrCreateMat(materialsFolder + "/Road.mat", new Color(0.15f, 0.15f, 0.15f, 1));
-            buildingMat = LoadOrCreateMat(materialsFolder + "/Building.mat", new Color(0.85f, 0.85f, 0.85f, 1));
-            landuseMat = LoadOrCreateMat(materialsFolder + "/Landuse.mat", new Color(0.75f, 0.9f, 0.75f, 1));
+            float buildingGray = 100 / 255f;
+            float roadGray = 150 / 255f;
+            roadMat = LoadOrCreateMat(materialsFolder + "/Road.mat", new Color(roadGray, roadGray, roadGray, 1));
+            buildingMat = LoadOrCreateMat(materialsFolder + "/Building.mat", new Color(buildingGray, buildingGray, buildingGray));
+            landuseMat = LoadOrCreateMat(materialsFolder + "/Landuse.mat", Color.green);
+            waterMat = LoadOrCreateMat(materialsFolder + "/Water.mat", Color.cyan);
         }
 
         /// <summary>
@@ -414,52 +452,88 @@ namespace GeoImport.Editor
         /// <param name="meshFolder">Folder path to save the mesh asset.</param>
         /// <param name="parentTransform">Transform to parent the created GameObject under.</param>
         /// <param name="counter">Reference to an integer counter for unique asset naming; incremented after creation.</param>
-        void MakeRoad(List<Vector2> polylinePoints, string highwayType, string meshFolder, Transform parentTransform, ref int counter)
+        void MakeRoad(List<Vector2> polylinePoints, string highwayType,
+              string meshFolder, Transform parentTransform, ref int counter)
         {
             if (polylinePoints.Count < 2) return;
+
             float roadWidth = WidthForHighway(highwayType);
             var roadMesh = PolylineMeshBuilder.Build(polylinePoints, roadWidth);
-            string meshPath = $"{meshFolder}/Road_{highwayType}_{counter}.asset";
-            AssetDatabase.CreateAsset(roadMesh, meshPath);
 
+            string meshPath = $"{meshFolder}/Road_{highwayType}_{counter}.asset";
+
+            // Defer asset creation → batch later
+            pendingMeshes.Add(new MeshWorkItem { mesh = roadMesh, path = meshPath });
+
+            // Create GameObject immediately (still needed in prefab hierarchy)
             var roadGameObject = new GameObject($"Road_{highwayType}_{counter}");
+            roadGameObject.transform.parent = parentTransform;
             var meshFilter = roadGameObject.AddComponent<MeshFilter>();
             var meshRenderer = roadGameObject.AddComponent<MeshRenderer>();
             meshFilter.sharedMesh = roadMesh;
             meshRenderer.sharedMaterial = roadMat;
+
             counter++;
         }
 
 
+        /// <summary>
+        /// Builds a filled area mesh from polygon rings (outer boundary with optional holes),
+        /// tessellates it using LibTessDotNet, creates a GameObject with the given material,
+        /// and defers mesh asset creation for batched saving. The resulting mesh lies on the XY plane (Z = 0).
+        /// </summary>
+        /// <param name="rings">
+        /// Polygon rings in Unity meters. The first ring is the outer boundary; subsequent rings are holes.
+        /// Each ring is a list of 2D points already projected/scaled into Unity space.
+        /// </param>
+        /// <param name="material">Material to assign to the created MeshRenderer.</param>
+        /// <param name="prefix">
+        /// Name prefix used for the generated mesh asset and GameObject (e.g., "Building_", "Landuse_").
+        /// </param>
+        /// <param name="meshFolder">AssetDatabase path where the mesh asset will be saved.</param>
+        /// <param name="parentTransform">
+        /// Intended parent Transform for the created GameObject. Note: currently not applied in this implementation.
+        /// </param>
+        /// <param name="counter">
+        /// Reference counter used to produce unique names/paths for assets and objects; incremented upon success.
+        /// </param>
+        /// <remarks>
+        /// Steps:
+        /// 1) Validate that an outer ring exists and has at least three points; otherwise, return.
+        /// 2) Convert each ring to a LibTessDotNet contour and add it with CounterClockwise orientation.
+        /// 3) Tessellate using WindingRule.EvenOdd into triangles (polySize = 3).
+        /// 4) Copy tessellated vertices into a Unity Mesh on the XY plane and build triangle indices.
+        /// 5) Recalculate bounds (normals are skipped for performance; suitable for unlit materials).
+        /// 6) Queue the mesh into a pending list for batched AssetDatabase.CreateAsset later.
+        /// 7) Create a GameObject with MeshFilter/MeshRenderer, assign the mesh and provided material.
+        /// 8) Increment the provided counter to ensure unique naming on subsequent calls.
+        /// 
+        /// Notes:
+        /// - Input coordinates must already be projected to meters and scaled by the configured meters-to-Unity factor.
+        /// - The mesh is suitable for flat areas like building footprints, plazas, or landuse patches.
+        /// - Unity Editor APIs are used; execution must occur on the main editor thread.
+        /// </remarks>
         void MakeArea(List<List<Vector2>> rings, Material material, string prefix,
-                      string meshFolder, Transform parentTransform, ref int counter)
+              string meshFolder, Transform parentTransform, ref int counter)
         {
             if (rings.Count == 0 || rings[0].Count < 3) return;
 
             // --- Tessellate with LibTess ---
             var tess = new Tess();
-
             foreach (var ring in rings)
             {
                 if (ring.Count < 3) continue;
-
                 var contour = new ContourVertex[ring.Count];
                 for (int i = 0; i < ring.Count; i++)
-                {
                     contour[i].Position = new Vec3(ring[i].x, ring[i].y, 0);
-                }
-
                 tess.AddContour(contour, ContourOrientation.CounterClockwise);
             }
-
             tess.Tessellate(WindingRule.EvenOdd, ElementType.Polygons, 3);
 
             // --- Build Unity mesh ---
             var verts = new Vector3[tess.Vertices.Length];
             for (int i = 0; i < verts.Length; i++)
-            {
                 verts[i] = new Vector3(tess.Vertices[i].Position.X, tess.Vertices[i].Position.Y, 0);
-            }
 
             var indices = new int[tess.ElementCount * 3];
             for (int i = 0; i < tess.ElementCount; i++)
@@ -469,23 +543,30 @@ namespace GeoImport.Editor
                 indices[i * 3 + 2] = tess.Elements[i * 3 + 2];
             }
 
-            var areaMesh = new Mesh();
-            areaMesh.vertices = verts;
-            areaMesh.triangles = indices;
+            var areaMesh = new Mesh
+            {
+                vertices = verts,
+                triangles = indices
+            };
             areaMesh.RecalculateBounds();
-            areaMesh.RecalculateNormals();
+            // skip normals if you don’t need lighting: areaMesh.RecalculateNormals();
 
-            // --- Save asset & prefab ---
             string meshPath = $"{meshFolder}/{prefix}{counter}.asset";
-            AssetDatabase.CreateAsset(areaMesh, meshPath);
 
+            // Defer asset creation → batch later
+            pendingMeshes.Add(new MeshWorkItem { mesh = areaMesh, path = meshPath });
+
+            // Create GameObject immediately (still needed for prefab structure)
             var areaGameObject = new GameObject($"{prefix}{counter}");
+            areaGameObject.transform.parent = parentTransform;
             var meshFilter = areaGameObject.AddComponent<MeshFilter>();
             var meshRenderer = areaGameObject.AddComponent<MeshRenderer>();
             meshFilter.sharedMesh = areaMesh;
             meshRenderer.sharedMaterial = material;
+
             counter++;
         }
+
 
         #region Chunking process
         /// <summary>
@@ -535,6 +616,16 @@ namespace GeoImport.Editor
                 Mathf.FloorToInt(pos.y / chunkSizeMeters)
             );
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private class MeshWorkItem
+        {
+            public Mesh mesh;
+            public string path;
+        }
+
         #endregion Chunking process
     }
 }
