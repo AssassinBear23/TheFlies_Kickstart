@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 4658aa82f6f25404894af2ce4fa808fd
+guid: 608d877a72da92247bb901344585ea0f
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7203339641779158459
-    second: Carp_0
+      213: -532977910740856011
+    second: Carp_Sprite_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -47,13 +47,13 @@ TextureImporter:
   lightmap: 0
   compressionQuality: 50
   spriteMode: 1
-  spriteExtrude: 1
+  spriteExtrude: 0
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
-  spriteGenerateFallbackPhysicsShape: 1
+  spriteGenerateFallbackPhysicsShape: 0
   alphaUsage: 1
   alphaIsTransparency: 1
   spriteTessellationDetail: -1
@@ -72,10 +72,10 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 2048
+    maxTextureSize: 1024
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 2
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -98,14 +98,14 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
     buildTarget: Android
-    maxTextureSize: 2048
+    maxTextureSize: 1024
     resizeAlgorithm: 0
-    textureFormat: -1
+    textureFormat: 47
     textureCompression: 1
-    compressionQuality: 50
+    compressionQuality: 100
     crunchedCompression: 0
     allowsAlphaSplitting: 0
-    overridden: 0
+    overridden: 1
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Carp_0
+      name: Carp_Sprite_0
       rect:
         serializedVersion: 2
-        x: 59
-        y: 487
-        width: 1959
-        height: 1324
+        x: 29
+        y: 247
+        width: 981
+        height: 659
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: bbd7cb04d3767f360800000000000000
-      internalID: 7203339641779158459
+      spriteID: 533592df96b7a98f0800000000000000
+      internalID: -532977910740856011
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Carp_0: 7203339641779158459
+      Carp_Sprite_0: -532977910740856011
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
