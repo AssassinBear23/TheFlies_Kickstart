@@ -12,5 +12,15 @@ namespace Core.Data
         //[SerializeField] private string countryName;
         [SerializeField] private Sprite countryIcon;
         [SerializeField] private List<FishData> availableFish;
+
+        /// <summary>
+        /// Gets the icon representing the country.
+        /// </summary>
+        public Sprite CountryIcon => countryIcon;
+
+        /// <summary>
+        /// Gets the list of available fish in the country.
+        /// </summary>
+        public List<FishData> AvailableFish => availableFish;
     }
 }
