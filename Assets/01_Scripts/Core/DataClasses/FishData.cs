@@ -28,11 +28,11 @@ namespace Core.Data
 
         private void OnValidate()
         {
-            ControlInspctorVectorInput(ref weightRangeKg);
-            ControlInspctorVectorInput(ref lengthRangeCm);
+            ControlInspectorVectorInput(ref weightRangeKg);
+            ControlInspectorVectorInput(ref lengthRangeCm);
         }
 
-        private void ControlInspctorVectorInput(ref Vector2 variable)
+        private void ControlInspectorVectorInput(ref Vector2 variable)
         {
             //var temp = variable;
             if (variable.x <= 0) variable.x = 0.001f;
