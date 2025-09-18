@@ -1,0 +1,5 @@
+// filtering
+osmium tags-filter download.osm nwr/highway nwr/buildings nwr/landuse nwr/natural=water nwr/waterways -O -o filtered.osm
+
+// exporting
+osmium export filtered.osm --geometry-types=linestring,polygon,multipolygon -O -o finalData.geojson
