@@ -1,9 +1,9 @@
+using Core.Managers;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class InputManager : MonoBehaviour
 {
-    public static InputManager Instance { get; private set; }
     PlayerInput playerInput;
 
     private void Start()
@@ -11,11 +11,11 @@ public class InputManager : MonoBehaviour
         playerInput = GetComponent<PlayerInput>();
     }
 
-    public void SetupInstance()
+    public void SetupInputManager()
     {
-        if (Instance == null)
+        if(GameManager.Instance.inputManager == null)
         {
-            Instance = this;
+            GameManager.Instance.inputManager = this;
         }
         else
         {

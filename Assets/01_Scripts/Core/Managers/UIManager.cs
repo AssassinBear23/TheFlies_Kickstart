@@ -66,14 +66,6 @@ namespace Core.Managers
         #region SetupMethods
 
         /// <summary>
-        /// Default Unity Method called when the script is enabled.
-        /// </summary>
-        private void OnEnable()
-        {
-            SetupUIManager();
-        }
-
-        /// <summary>
         /// Default Unity Method called when the script is first loaded.
         /// </summary>
         private void Start()
@@ -103,7 +95,7 @@ namespace Core.Managers
         {
             if (inputManager == null)
             {
-                inputManager = InputManager.Instance;
+                inputManager = GameManager.Instance.inputManager;
             }
             if (inputManager == null)
             {
@@ -128,11 +120,12 @@ namespace Core.Managers
         /// </summary>
         public void SetupUIManager()
         {
-            if (GameManager.Instance.uiManager == null && GameManager.Instance != null)
+            if (GameManager.Instance != null && GameManager.Instance.uiManager == null)
             {
                 try
                 {
                     GameManager.Instance.uiManager = this;
+                    SetInputManagerReference();
                 }
                 catch (System.Exception)
                 {

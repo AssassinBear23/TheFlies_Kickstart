@@ -7,8 +7,8 @@ namespace Core.Managers
     {
         public static GameManager Instance { get; private set; }
 
-        [HideInInspector] public InputManager inputManager;
-        [HideInInspector] public UIManager uiManager;
+        /*[HideInInspector]*/ public InputManager inputManager;
+        /*[HideInInspector]*/ public UIManager uiManager;
 
         [Space(20), Header("Events"), Space(10)]
         /// <summary>

@@ -340,6 +340,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1869836022 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8860512093477780179, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
+  m_PrefabInstance: {fileID: 8451973994280646092}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ec9f1a8b5255094fa2a69acc5e66aa6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &6068008237187789349
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -391,6 +402,14 @@ PrefabInstance:
     - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
       propertyPath: managerSetupSequence.m_PersistentCalls.m_Calls.Array.data[2].m_Target
       value: 
+      objectReference: {fileID: 1869836022}
+    - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
+      propertyPath: managerSetupSequence.m_PersistentCalls.m_Calls.Array.data[1].m_MethodName
+      value: SetupInputManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
+      propertyPath: managerSetupSequence.m_PersistentCalls.m_Calls.Array.data[2].m_MethodName
+      value: SetupUIManager
       objectReference: {fileID: 0}
     - target: {fileID: 8031132822730129125, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
       propertyPath: m_Name
