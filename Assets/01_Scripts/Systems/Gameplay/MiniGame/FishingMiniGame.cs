@@ -24,16 +24,16 @@ namespace Minigame
         /// If this value drops to -1.0 or below, the fish escapes and the player loses.
         /// </summary>
         [SerializeField] private float catchingProgress = 0.2f;
-        [SerializeField, Range(0.1f, 0.7f)] private float catchingSpeed = .25f;
-        [SerializeField, Range(0.1f, 0.7f)] private float escapingSpeed = .2f;
+        [SerializeField, Range(0.01f, 0.7f)] private float catchingSpeed = .25f;
+        [SerializeField, Range(0.01f, 0.7f)] private float escapingSpeed = .2f;
         /// <summary>
         /// Represents the current tension value in the system.
         /// </summary>
         /// <remarks>This value is used to track the current level of tension, which may influence other
         /// behaviors or calculations.</remarks>
         [SerializeField] private float currentTension;
-        [SerializeField, Range(0.1f, 0.5f)] private float tensionIncreaseRate = 0.15f;
-        [SerializeField, Range(0.1f, 0.5f)] private float tensionDecreaseRate = 0.1f;
+        [SerializeField, Range(0.01f, 0.5f)] private float tensionIncreaseRate = 0.15f;
+        [SerializeField, Range(0.01f, 0.5f)] private float tensionDecreaseRate = 0.1f;
 
         [Header("References")]
         [Tooltip("The Fishdata of the fish that the player is attempting to catch")]
@@ -54,15 +54,28 @@ namespace Minigame
         /// </summary>
         /// <param name="value">The <see cref="FishData"/> object representing the fish data to be set.</param>
         /// <exception cref="InvalidOperationException">Thrown if the fish data has already been set for this minigame instance.</exception>
-        public void SetSetFishData(FishData value)
+        public void SetFishData(FishData value)
         {
             if (referenceFish == null)
             {
                 referenceFish = value;
-                fishInstance = new CaughtFish(referenceFish);
-                difficultyModifier *= StatModifiers(referenceFish, fishInstance);
+                GetInstanceAndModifier();
             }
             else throw new InvalidOperationException("Fish data can only be set once per minigame instance.");
+        }
+
+        private void Start()
+        {
+            GetInstanceAndModifier();
+        }
+
+        /// <summary>
+        /// Initializes the fish instance and calculates the difficulty modifier.
+        /// </summary>
+        private void GetInstanceAndModifier()
+        {
+                fishInstance = new CaughtFish(referenceFish);
+            difficultyModifier *= StatModifiers(referenceFish, fishInstance);            
         }
 
         /// <summary>
@@ -95,6 +108,11 @@ namespace Minigame
         /// </summary>
         private void Update()
         {
+            if(fishInstance == null)
+            {
+                if(Input.anyKeyDown) GetInstanceAndModifier();
+            }
+
             // If player is pressing -> shrink circle & build tension
             if (isHolding)
             {
@@ -138,7 +156,7 @@ namespace Minigame
         /// </summary>
         private void UpdateCircleVisual()
         {
-            circleRenderer.material.SetFloat("_Progress", catchingProgress);
+            circleRenderer.material.SetFloat("_Progress", 1 - catchingProgress);
         }
 
 
@@ -154,7 +172,7 @@ namespace Minigame
             {
                 Lose("Rod Snapped");
             }
-            if (catchingProgress <= -.5f)
+            if (catchingProgress <= 0)
             {
                 Lose("Fish Escaped");
             }

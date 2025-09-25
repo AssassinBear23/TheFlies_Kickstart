@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37f0bbcf925f20d4a88eff7f42fd66b1, type: 3}
   m_Name: Carp
   m_EditorClassIdentifier: 
-  sprite: {fileID: 21300000, guid: 4658aa82f6f25404894af2ce4fa808fd, type: 3}
+  sprite: {fileID: 21300000, guid: 608d877a72da92247bb901344585ea0f, type: 3}
   rarity: 0
   type: 0
-  weightRangeKg: {x: 0.001, y: 0.001}
-  lengthRangeCm: {x: 0.001, y: 0.001}
+  weightRangeKg: {x: 1, y: 3}
+  lengthRangeCm: {x: 15, y: 100}
+  fishName: Carp

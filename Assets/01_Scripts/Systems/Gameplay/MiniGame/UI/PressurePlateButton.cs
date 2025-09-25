@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Minigame.UI
 {
@@ -9,6 +10,12 @@ namespace Minigame.UI
     public class PressurePlateButton : MonoBehaviour, IPointerEnterHandler, IPointerUpHandler, IPointerExitHandler
     {
         [SerializeField] private FishingMinigame currentGameInstance;
+
+        void Start()
+        {
+            Image img = GetComponent<Image>();
+            img.alphaHitTestMinimumThreshold = 0.5f; // Only pixels with alpha > 0.5 count as hit
+        }
 
         public void OnPointerEnter(PointerEventData eventData) => currentGameInstance.SetPress(true);
 

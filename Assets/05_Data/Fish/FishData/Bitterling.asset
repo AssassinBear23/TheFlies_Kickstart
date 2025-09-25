@@ -15,5 +15,6 @@ MonoBehaviour:
   sprite: {fileID: 21300000, guid: 601648b26c922c042b805b09f5862f49, type: 3}
   rarity: 0
   type: 0
-  weightRangeKg: {x: 0.001, y: 0.001}
-  lengthRangeCm: {x: 0.001, y: 0.001}
+  weightRangeKg: {x: 0.1, y: 1.2}
+  lengthRangeCm: {x: 20, y: 30}
+  fishName: Bitterling

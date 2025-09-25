@@ -1,3 +1,4 @@
+using Core.Data;
 using System.Collections.Generic;
 using System.Linq;
 using UI;
@@ -221,6 +222,11 @@ namespace Core.Managers
             }
         }
 
+        public void NoPage()
+        {
+            SetActiveAllPages(false);
+        }
+
         /// <summary>
         /// Turns all stored pages on or off depending on the passed parameter.
         /// </summary>
@@ -238,6 +244,22 @@ namespace Core.Managers
                     page.gameObject.SetActive(activeState);
                 }
             }
+        }
+
+        private void UpdateEndScreen(CaughtFish fish)
+        {
+            // Update the end screen UI elements with the caught fish data
+            EndResultPage endResultPage = FindFirstObjectByType<EndResultPage>();
+            if (endResultPage != null)
+            {
+                endResultPage.SetTextCorrect(fish);
+            }
+        }
+
+
+        public void UpdateEndScreen()
+        {
+            UpdateEndScreen(GameManager.Instance.LastCaughtFish);
         }
 
         #endregion

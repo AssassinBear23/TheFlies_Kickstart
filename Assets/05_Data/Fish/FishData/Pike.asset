@@ -15,5 +15,6 @@ MonoBehaviour:
   sprite: {fileID: 21300000, guid: ab868fb875b2f8148b271284edfc26fd, type: 3}
   rarity: 0
   type: 0
-  weightRangeKg: {x: 0.001, y: 0.001}
-  lengthRangeCm: {x: 0.001, y: 0.001}
+  weightRangeKg: {x: 0.2, y: 2.5}
+  lengthRangeCm: {x: 5, y: 60}
+  fishName: Pike

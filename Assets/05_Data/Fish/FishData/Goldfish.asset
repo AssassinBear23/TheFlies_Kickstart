@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37f0bbcf925f20d4a88eff7f42fd66b1, type: 3}
   m_Name: Goldfish
   m_EditorClassIdentifier: 
-  sprite: {fileID: 21300000, guid: 894e5701d6832fd49a4d935323369155, type: 3}
-  rarity: 0
+  sprite: {fileID: 4071506864295261471, guid: 7ea138d0be492d140badea81c0fb905f, type: 3}
+  rarity: 2
   type: 0
-  weightRangeKg: {x: 0.001, y: 0.001}
-  lengthRangeCm: {x: 0.001, y: 0.001}
+  weightRangeKg: {x: 0.1, y: 0.3}
+  lengthRangeCm: {x: 15, y: 20}
+  fishName: Goldfish
