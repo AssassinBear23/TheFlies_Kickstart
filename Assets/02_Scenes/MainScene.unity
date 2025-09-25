@@ -442,8 +442,8 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 1814903541941178328, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
-      propertyPath: m_ScreenMatchMode
-      value: 0
+      propertyPath: m_ReferencePixelsPerUnit
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 3107287083870127405, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
       propertyPath: m_Name

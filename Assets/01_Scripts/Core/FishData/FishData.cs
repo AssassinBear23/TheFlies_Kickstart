@@ -9,22 +9,26 @@ namespace Core.Data
     [CreateAssetMenu(fileName = "FishName", menuName = "Data/Fish/FishData")]
     public class FishData : ScriptableObject
     {
-        [field: Tooltip("The sprite representing the fish")]
+        [Tooltip("The sprite representing the fish")]
         [SerializeField] private Sprite sprite;
-        [field: Tooltip("The rarity of the fish")]
+        [Tooltip("The rarity of the fish")]
         [SerializeField] private FishRarity rarity;
-        [field: Tooltip("The type of water the fish lives in")]
+        [Tooltip("The type of water the fish lives in")]
         [SerializeField] private FishType type;
-        [field: Tooltip("The minimum and maximum weight of the fish in kilograms")]
+        [Tooltip("The minimum and maximum weight of the fish in kilograms")]
         [SerializeField, MinMaxVector2] private Vector2 weightRangeKg;
-        [field: Tooltip("The minimum and maximum size of the fish in centimeters")]
+        [Tooltip("The minimum and maximum size of the fish in centimeters")]
         [SerializeField, MinMaxVector2] private Vector2 lengthRangeCm;
+        [Tooltip("The display name of this fish")]
+        [SerializeField] private string fishName;
 
         public Sprite Sprite => sprite;
         public FishRarity Rarity => rarity;
         public FishType Type => type;
         public Vector2 WeightRangeKg => weightRangeKg;
         public Vector2 LengthRangeCm => lengthRangeCm;
+        public string FishName => fishName;
+
 
         private void OnValidate()
         {

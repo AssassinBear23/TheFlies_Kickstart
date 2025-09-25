@@ -9,9 +9,9 @@ namespace Core.Data
     public class CaughtFish
     {
         /// <summary>
-        /// Reference to the base fish data scriptable object containing species information.
+        /// The visual representation of the caught fish.
         /// </summary>
-        public FishData BaseData { get; private set; }
+        public Sprite Sprite { get; private set; }
 
         /// <summary>
         /// The weight of the caught fish in kilograms.
@@ -24,16 +24,35 @@ namespace Core.Data
         public float Length { get; private set; }
 
         /// <summary>
+        /// The rarity classification of the caught fish.
+        /// </summary>
+        public FishRarity Rarity { get; private set; }
+
+        /// <summary>
+        /// The name of the fish species.
+        /// </summary>
+        public string FishName { get; private set; }
+
+        /// <summary>
+        /// The type of water the fish naturally inhabits (freshwater or saltwater).
+        /// </summary>
+        public FishType Type { get; private set; }
+
+        /// <summary>
         /// Creates a new caught fish instance with randomly generated weight and length based on the fish data ranges.
         /// </summary>
         /// <param name="baseData">The base fish data containing information about the fish species.</param>
         public CaughtFish(FishData baseData)
         {
-            BaseData = baseData;
+            FishName = baseData.FishName;
+            Rarity = baseData.Rarity;
+            Type = baseData.Type;
+            Sprite = baseData.Sprite;
 
             // Roll values based on the SO's ranges
-            Weight = Random.Range(baseData.WeightRangeKg.x, baseData.WeightRangeKg.y);
             Length = Random.Range(baseData.LengthRangeCm.x, baseData.LengthRangeCm.y);
+            float normalLength = (Length - baseData.LengthRangeCm.x) / (baseData.LengthRangeCm.y - baseData.LengthRangeCm.x);
+            Weight = Mathf.Lerp(baseData.WeightRangeKg.x, baseData.WeightRangeKg.y, normalLength);
         }
     }
 }

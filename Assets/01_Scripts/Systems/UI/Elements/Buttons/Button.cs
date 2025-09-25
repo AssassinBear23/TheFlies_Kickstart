@@ -1,8 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
-public class Button : UIElement
+namespace UI.Elements.Buttons
 {
-    
+    public class Button : UIElement
+    {
+
+    }
 }
