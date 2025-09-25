@@ -119,6 +119,11 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!224 &136694835 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 5656690600071445463, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
+  m_PrefabInstance: {fileID: 8451973994280646092}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -250,7 +255,7 @@ Transform:
   m_GameObject: {fileID: 519420028}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 306, y: -26, z: -10}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -400,6 +405,14 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
+      propertyPath: uiRoot
+      value: 
+      objectReference: {fileID: 136694835}
+    - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
+      propertyPath: minigamePrefab
+      value: 
+      objectReference: {fileID: 2003343288580665629, guid: 98d6682cbeea1d3408aa182a17b6d5e3, type: 3}
+    - target: {fileID: 5592725436685488364, guid: 80b199f315e8d004eb679eb28cf25d42, type: 3}
       propertyPath: managerSetupSequence.m_PersistentCalls.m_Calls.Array.data[2].m_Target
       value: 
       objectReference: {fileID: 1869836022}
@@ -428,6 +441,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1814903541941178328, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
+      propertyPath: m_ScreenMatchMode
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3107287083870127405, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
       propertyPath: m_Name
       value: UI
@@ -471,10 +488,6 @@ PrefabInstance:
     - target: {fileID: 8022075740794256081, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8200791376860352401, guid: 0a03d611017600048a6582f60ecb77a1, type: 3}
-      propertyPath: m_PointerBehavior
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
